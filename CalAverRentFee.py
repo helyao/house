@@ -36,16 +36,26 @@ def getSaleInfoDetail(uid):
         with open('{}/{}.html'.format(CACHE_SALE, uid), 'r', encoding='utf-8') as file:
             html = file.read()
             soup = BeautifulSoup(html, 'lxml')
-            div = soup.select_one('#ldp-sticky-bar-js-save')
-            info_lis = div.select_one('.property-meta').select('li')
+            div1 = soup.select_one('#ldp-sticky-bar-js-save')
+            info_lis = div1.select_one('.property-meta').select('li')
             for li in info_lis:
                 key = li.attrs['data-label'].replace('property-meta-', '')
                 value = int(li.select_one('.data-value').text.strip().replace(',', ''))
                 res[key] = value
-            price_lis = div('li')
+            price_lis = div1('li')
             for li in price_lis:
                 if '$' in li.text.strip():
                     res['price'] = int(li.text.strip().replace('$', '').replace(',', ''))
+            div2 = soup.select_one('#key-fact-carousel')
+            info_2_lis = div2.select_one('.owl-carousel').select('li')
+            for li in info_2_lis:
+                key = li.select_one('div').text.strip().lower()
+                value = li.select_one('.key-fact-data').text.strip()
+                if key == 'price/sq ft':
+                    key = 'average'
+                elif 'realtor.com' in key:
+                    key = 'hang'
+                res[key] = value
         return res
     except Exception as ex:
         print(ex)
