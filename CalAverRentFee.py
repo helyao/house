@@ -4,6 +4,7 @@
 # @Author     :   Helyao
 # * 2018-05-16    Init
 import os
+import random
 import pymysql
 import requests
 from bs4 import BeautifulSoup
@@ -11,16 +12,57 @@ from configparser import ConfigParser
 
 CACHE_SALE = r'./cache/sale'
 CACHE_RENT = r'./cache/rent'
+CACHE_LIST = r'./cache/list'
+
+user_agent_list = [
+    "Mozilla/5.0 (iPod; U; CPU iPhone OS 4_3_2 like Mac OS X; zh-cn) AppleWebKit/533.17.9 (KHTML, like Gecko) Version/5.0.2 Mobile/8H7 Safari/6533.18.5",
+    "Mozilla/5.0 (iPhone; U; CPU iPhone OS 4_3_2 like Mac OS X; zh-cn) AppleWebKit/533.17.9 (KHTML, like Gecko) Version/5.0.2 Mobile/8H7 Safari/6533.18.5",
+    "MQQBrowser/25 (Linux; U; 2.3.3; zh-cn; HTC Desire S Build/GRI40;480*800)",
+    "Mozilla/5.0 (Linux; U; Android 2.3.3; zh-cn; HTC_DesireS_S510e Build/GRI40) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1",
+    "Mozilla/5.0 (SymbianOS/9.3; U; Series60/3.2 NokiaE75-1 /110.48.125 Profile/MIDP-2.1 Configuration/CLDC-1.1 ) AppleWebKit/413 (KHTML, like Gecko) Safari/413",
+    "Mozilla/5.0 (iPad; U; CPU OS 4_3_3 like Mac OS X; zh-cn) AppleWebKit/533.17.9 (KHTML, like Gecko) Mobile/8J2",
+    "Mozilla/5.0 (Windows NT 5.2) AppleWebKit/534.30 (KHTML, like Gecko) Chrome/12.0.742.122 Safari/534.30",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_2) AppleWebKit/535.1 (KHTML, like Gecko) Chrome/14.0.835.202 Safari/535.1",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_2) AppleWebKit/534.51.22 (KHTML, like Gecko) Version/5.1.1 Safari/534.51.22",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 5_0 like Mac OS X) AppleWebKit/534.46 (KHTML, like Gecko) Version/5.1 Mobile/9A5313e Safari/7534.48.3",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 5_0 like Mac OS X) AppleWebKit/534.46 (KHTML, like Gecko) Version/5.1 Mobile/9A5313e Safari/7534.48.3",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 5_0 like Mac OS X) AppleWebKit/534.46 (KHTML, like Gecko) Version/5.1 Mobile/9A5313e Safari/7534.48.3",
+    "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/535.1 (KHTML, like Gecko) Chrome/14.0.835.202 Safari/535.1",
+    "Mozilla/5.0 (compatible; MSIE 9.0; Windows Phone OS 7.5; Trident/5.0; IEMobile/9.0; SAMSUNG; OMNIA7)",
+    "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0; XBLWP7; ZuneWP7)",
+    "Mozilla/5.0 (Windows NT 5.2) AppleWebKit/534.30 (KHTML, like Gecko) Chrome/12.0.742.122 Safari/534.30",
+    "Mozilla/5.0 (Windows NT 5.1; rv:5.0) Gecko/20100101 Firefox/5.0",
+    "Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 5.2; Trident/4.0; .NET CLR 1.1.4322; .NET CLR 2.0.50727; .NET4.0E; .NET CLR 3.0.4506.2152; .NET CLR 3.5.30729; .NET4.0C)",
+    "Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.2; .NET CLR 1.1.4322; .NET CLR 2.0.50727; .NET4.0E; .NET CLR 3.0.4506.2152; .NET CLR 3.5.30729; .NET4.0C)",
+    "Mozilla/4.0 (compatible; MSIE 60; Windows NT 5.1; SV1; .NET CLR 2.0.50727)",
+    "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0; SLCC2; .NET CLR 2.0.50727; .NET CLR 3.5.30729; .NET CLR 3.0.30729; Media Center PC 6.0; .NET4.0C; .NET4.0E)",
+    "Opera/9.80 (Windows NT 5.1; U; zh-cn) Presto/2.9.168 Version/11.50",
+    "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1)",
+    "Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 5.1; Trident/4.0; .NET CLR 2.0.50727; .NET CLR 3.0.04506.648; .NET CLR 3.5.21022; .NET4.0E; .NET CLR 3.0.4506.2152; .NET CLR 3.5.30729; .NET4.0C)",
+    "Mozilla/5.0 (Windows; U; Windows NT 5.1; zh-CN) AppleWebKit/533.21.1 (KHTML, like Gecko) Version/5.0.5 Safari/533.21.1",
+    "Mozilla/5.0 (Windows; U; Windows NT 5.1; ) AppleWebKit/534.12 (KHTML, like Gecko) Maxthon/3.0 Safari/534.12",
+    "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1; .NET CLR 2.0.50727; TheWorld)"
+]
+
+def getAgentRandom():
+    global user_agent_list
+    return user_agent_list[random.randint(0, (len(user_agent_list) - 1))]
 
 # Download url page
-def download(url, uid, path):
-    if os.path.exists('{}/{}.html'.format(path, uid)):
-        return True
-    res = requests.get(url)
-    if (res.status_code == 200):
+def download(url, name, agent=None, force=False):
+    if force == False:
+        if os.path.exists(name):
+            return True
+    if agent == None:
+        agent = getAgentRandom()
+    headers = {'User-agent': agent}
+    res = requests.get(url, headers=headers, allow_redirects=False)
+    print(url)
+    print(res.status_code)
+    if res.status_code == 200:
         html = res.content.decode('utf-8')
         try:
-            with open('{}/{}.html'.format(path, uid), 'w', encoding='utf-8') as file:
+            with open(name, 'w', encoding='utf-8') as file:
                 file.write(html)
         except Exception as ex:
             print(ex)
@@ -45,7 +87,7 @@ def getSaleInfoDetail(uid):
             price_lis = div1('li')
             for li in price_lis:
                 if '$' in li.text.strip():
-                    res['price'] = int(li.text.strip().replace('$', '').replace(',', ''))
+                    res['price'] = int(li.text.strip().replace('$', '').replace(',', '').replace('Est.', ''))
             div2 = soup.select_one('#key-fact-carousel')
             info_2_lis = div2.select_one('.owl-carousel').select('li')
             for li in info_2_lis:
@@ -60,6 +102,44 @@ def getSaleInfoDetail(uid):
     except Exception as ex:
         print(ex)
         return False
+
+# Get max page of rent list
+def getMaxPageOfRentList(zipcode):
+    try:
+        with open('./{}/{}.html'.format(CACHE_LIST, zipcode), 'r', encoding='utf-8') as file:
+            html = file.read()
+            soup = BeautifulSoup(html, 'lxml')
+            pages = soup.select_one('#ResultsPerPageBottom').select('.page')
+            max = int(pages[-1].text.strip())
+            return max
+    except Exception as ex:
+        print(ex)
+        return 0
+
+# Get rent urls
+def getRentUrls(name):
+    res = []
+    return res
+
+# Get rent list
+def getRentList(zipcode):
+    res = {'zipcode': zipcode, 'list': []}
+    max = getMaxPageOfRentList(zipcode)
+    for i in range(max):
+        page = i + 1
+        print('page = {}/{}'.format(page, max))
+        if page > 1:
+            url = 'https://www.realtor.com/apartments/{}/pg-{}'.format(zipcode, page)
+            if download(url, './{}/{}-{}.html'.format(CACHE_LIST, zipcode, page)):
+                list = getRentUrls('./{}/{}-{}.html'.format(CACHE_LIST, zipcode, page))
+                if list:
+                    res['list'].append(list)
+        else:
+            list = getRentUrls('./{}/{}.html'.format(CACHE_LIST, zipcode))
+            if list:
+                res['list'].append(list)
+
+    return res
 
 # Explain detail information for rent
 def getRentInfoDetail(uid):
@@ -77,7 +157,7 @@ if __name__ == '__main__':
     mysql_db = conf.get('mysql', 'db')
     mysql_charset = conf.get('mysql', 'charset')
     # [realtor]
-    realtor_demo = conf.get('realtor', 'sample')
+    realtor_sample = conf.get('realtor', 'sample')
 
     # Step2. Get the sample information
     conn = pymysql.connect(
@@ -88,16 +168,23 @@ if __name__ == '__main__':
     cursor = conn.cursor()
     sql = '''
         select url, uid, zipcode from record where uid = '{}'
-        '''.format(realtor_demo)
+        '''.format(realtor_sample)
     cursor.execute(sql)
     item = cursor.fetchone()
     sample_base_url = item[0]
     sample_zipcode = item[2]
+    print("url = {}".format(sample_base_url))
+    print("sample = {}".format(realtor_sample))
+    print("zipcode = {}".format(sample_zipcode))
 
     # Step3. Cache the sample detail page
-    if download(sample_base_url, realtor_demo, CACHE_SALE):
-        res = getSaleInfoDetail(realtor_demo)
+    if download(sample_base_url, './{}/{}.html'.format(CACHE_SALE, realtor_sample), force=False):
+        res = getSaleInfoDetail(realtor_sample)
         if res:
             print('result = {}'.format(res))
 
     # Step4. Cache all the rent detail page with the same zipcode
+    if download('https://www.realtor.com/apartments/{}'.format(sample_zipcode), './{}/{}.html'.format(CACHE_LIST, sample_zipcode), force=False):
+        res = getRentList(sample_zipcode)
+        if res:
+            print('result = {}'.format(res))
