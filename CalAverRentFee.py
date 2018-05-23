@@ -4,6 +4,7 @@
 # @Author     :   Helyao
 # * 2018-05-16    Init
 import os
+import time
 import random
 import pymysql
 import requests
@@ -13,6 +14,10 @@ from configparser import ConfigParser
 CACHE_SALE = r'./cache/sale'
 CACHE_RENT = r'./cache/rent'
 CACHE_LIST = r'./cache/list'
+
+CRAWLER = True
+
+BASE_URL = 'https://www.realtor.com'
 
 user_agent_list = [
     "Mozilla/5.0 (iPod; U; CPU iPhone OS 4_3_2 like Mac OS X; zh-cn) AppleWebKit/533.17.9 (KHTML, like Gecko) Version/5.0.2 Mobile/8H7 Safari/6533.18.5",
@@ -119,6 +124,18 @@ def getMaxPageOfRentList(zipcode):
 # Get rent urls
 def getRentUrls(name):
     res = []
+    with open(name, 'r', encoding='utf-8') as file:
+        html = file.read()
+        soup = BeautifulSoup(html, 'lxml')
+        lis = soup.select_one('#srp-list').select('.srp-item')
+        count = 0
+        for li in lis:
+            if 'data-url' in li.attrs.keys():
+                link = li.attrs['data-url']
+                # print(link)
+                count += 1
+                res.append(BASE_URL + link)
+        print('count = {}'.format(count))
     return res
 
 # Get rent list
@@ -128,17 +145,17 @@ def getRentList(zipcode):
     for i in range(max):
         page = i + 1
         print('page = {}/{}'.format(page, max))
+        time.sleep(3 + int(3 * random.random()))
         if page > 1:
             url = 'https://www.realtor.com/apartments/{}/pg-{}'.format(zipcode, page)
-            if download(url, './{}/{}-{}.html'.format(CACHE_LIST, zipcode, page)):
+            if download(url, './{}/{}-{}.html'.format(CACHE_LIST, zipcode, page), force=CRAWLER):
                 list = getRentUrls('./{}/{}-{}.html'.format(CACHE_LIST, zipcode, page))
                 if list:
-                    res['list'].append(list)
+                    res['list'].extend(list)
         else:
             list = getRentUrls('./{}/{}.html'.format(CACHE_LIST, zipcode))
             if list:
-                res['list'].append(list)
-
+                res['list'].extend(list)
     return res
 
 # Explain detail information for rent
@@ -178,13 +195,16 @@ if __name__ == '__main__':
     print("zipcode = {}".format(sample_zipcode))
 
     # Step3. Cache the sample detail page
-    if download(sample_base_url, './{}/{}.html'.format(CACHE_SALE, realtor_sample), force=False):
+    if download(sample_base_url, './{}/{}.html'.format(CACHE_SALE, realtor_sample), force=CRAWLER):
         res = getSaleInfoDetail(realtor_sample)
         if res:
             print('result = {}'.format(res))
+    time.sleep(3 + int(3 * random.random()))
 
     # Step4. Cache all the rent detail page with the same zipcode
-    if download('https://www.realtor.com/apartments/{}'.format(sample_zipcode), './{}/{}.html'.format(CACHE_LIST, sample_zipcode), force=False):
+    if download('https://www.realtor.com/apartments/{}'.format(sample_zipcode), './{}/{}.html'.format(CACHE_LIST, sample_zipcode), force=CRAWLER):
         res = getRentList(sample_zipcode)
         if res:
             print('result = {}'.format(res))
+
+    # Step5: Get the information of all the rent pages
