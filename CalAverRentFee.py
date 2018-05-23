@@ -15,7 +15,7 @@ CACHE_SALE = r'./cache/sale'
 CACHE_RENT = r'./cache/rent'
 CACHE_LIST = r'./cache/list'
 
-CRAWLER = True
+CRAWLER = False
 
 BASE_URL = 'https://www.realtor.com'
 
@@ -79,34 +79,34 @@ def download(url, name, agent=None, force=False):
 # Explain detail information for sale
 def getSaleInfoDetail(uid):
     res = {'uid': uid}
-    try:
-        with open('{}/{}.html'.format(CACHE_SALE, uid), 'r', encoding='utf-8') as file:
-            html = file.read()
-            soup = BeautifulSoup(html, 'lxml')
-            div1 = soup.select_one('#ldp-sticky-bar-js-save')
-            info_lis = div1.select_one('.property-meta').select('li')
-            for li in info_lis:
-                key = li.attrs['data-label'].replace('property-meta-', '')
-                value = int(li.select_one('.data-value').text.strip().replace(',', ''))
-                res[key] = value
-            price_lis = div1('li')
-            for li in price_lis:
-                if '$' in li.text.strip():
-                    res['price'] = int(li.text.strip().replace('$', '').replace(',', '').replace('Est.', ''))
-            div2 = soup.select_one('#key-fact-carousel')
-            info_2_lis = div2.select_one('.owl-carousel').select('li')
-            for li in info_2_lis:
-                key = li.select_one('div').text.strip().lower()
-                value = li.select_one('.key-fact-data').text.strip()
-                if key == 'price/sq ft':
-                    key = 'average'
-                elif 'realtor.com' in key:
-                    key = 'hang'
-                res[key] = value
-        return res
-    except Exception as ex:
-        print(ex)
-        return False
+    # try:
+    with open('{}/{}.html'.format(CACHE_SALE, uid), 'r', encoding='utf-8') as file:
+        html = file.read()
+        soup = BeautifulSoup(html, 'lxml')
+        div1 = soup.select_one('#ldp-property-meta')
+        info_lis = div1.select_one('.property-meta').select('li')
+        for li in info_lis:
+            key = li.attrs['data-label'].replace('property-meta-', '')
+            value = int(li.select_one('.data-value').text.strip().replace(',', ''))
+            res[key] = value
+        price_lis = div1('li')
+        for li in price_lis:
+            if '$' in li.text.strip():
+                res['price'] = int(li.text.strip().replace('$', '').replace(',', '').replace('Est.', ''))
+        div2 = soup.select_one('#key-fact-carousel')
+        info_2_lis = div2.select_one('.owl-carousel').select('li')
+        for li in info_2_lis:
+            key = li.select_one('div').text.strip().lower()
+            value = li.select_one('.key-fact-data').text.strip()
+            if key == 'price/sq ft':
+                key = 'average'
+            elif 'realtor.com' in key:
+                key = 'hang'
+            res[key] = value
+    return res
+    # except Exception as ex:
+    #     print(ex)
+    #     return False
 
 # Get max page of rent list
 def getMaxPageOfRentList(zipcode):
@@ -142,6 +142,8 @@ def getRentUrls(name):
 def getRentList(zipcode):
     res = {'zipcode': zipcode, 'list': []}
     max = getMaxPageOfRentList(zipcode)
+    if max == 0:    # If there is only one page in the list
+        max = 1
     for i in range(max):
         page = i + 1
         print('page = {}/{}'.format(page, max))
@@ -160,7 +162,36 @@ def getRentList(zipcode):
 
 # Explain detail information for rent
 def getRentInfoDetail(uid):
-    pass
+    res = {'uid': uid}
+    with open('{}/{}.html'.format(CACHE_RENT, uid), 'r', encoding='utf-8') as file:
+        html = file.read()
+        soup = BeautifulSoup(html, 'lxml')
+        div1 = soup.select_one('#ldp-property-meta')
+        info_lis = div1.select_one('.property-meta').select('li')
+        for li in info_lis:
+            key = li.attrs['data-label'].replace('property-meta-', '')
+            if key == 'pets':   # property-meta-pets content is OK
+                value = li.text.strip().replace('\n', '').split(' ')[-1]
+            else:
+                value = li.select_one('.data-value').text.strip().replace(',', '')
+            # value = li.select_one('.data-value').text.strip().replace(',', '').split(' ')[-1]  # some use range like M75388-22154(https://www.realtor.com/realestateandhomes-detail/5101-N-A-St_Midland_TX_79705_M75388-22154)
+            # print('key = {} & value = {}'.format(key, value))
+            res[key] = value
+        price_lis = div1('li')
+        for li in price_lis:
+            if '$' in li.text.strip():
+                res['price'] = int(li.text.strip().replace('$', '').replace(',', '').replace('Est.', '').split(' ')[-1])
+        div2 = soup.select_one('#key-fact-carousel')
+        info_2_lis = div2.select_one('.owl-carousel').select('li')
+        for li in info_2_lis:
+            key = li.select_one('div').text.strip().lower()
+            value = li.select_one('.key-fact-data').text.strip()
+            if key == 'price/sq ft':
+                key = 'average'
+            elif 'realtor.com' in key:
+                key = 'hang'
+            res[key] = value
+    return res
 
 if __name__ == '__main__':
     # Step1. Get config parameters
@@ -202,9 +233,23 @@ if __name__ == '__main__':
     time.sleep(3 + int(3 * random.random()))
 
     # Step4. Cache all the rent detail page with the same zipcode
+    lists = []
     if download('https://www.realtor.com/apartments/{}'.format(sample_zipcode), './{}/{}.html'.format(CACHE_LIST, sample_zipcode), force=CRAWLER):
         res = getRentList(sample_zipcode)
         if res:
+            lists = res['list']
             print('result = {}'.format(res))
 
     # Step5: Get the information of all the rent pages
+    for list in lists:
+        print(list)
+        rentId = list.split('_')[-1]
+        if download(list, './{}/{}.html'.format(CACHE_RENT, rentId), force=CRAWLER):
+            res = getRentInfoDetail(rentId)
+            if res:
+                print('result = {}'.format(res))
+
+    # Step6: Get the summary
+                
+
+
