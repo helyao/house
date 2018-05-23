@@ -89,10 +89,6 @@ def getSaleInfoDetail(uid):
             key = li.attrs['data-label'].replace('property-meta-', '')
             value = int(li.select_one('.data-value').text.strip().replace(',', ''))
             res[key] = value
-        price_lis = div1('li')
-        for li in price_lis:
-            if '$' in li.text.strip():
-                res['price'] = int(li.text.strip().replace('$', '').replace(',', '').replace('Est.', ''))
         div2 = soup.select_one('#key-fact-carousel')
         info_2_lis = div2.select_one('.owl-carousel').select('li')
         for li in info_2_lis:
@@ -103,6 +99,14 @@ def getSaleInfoDetail(uid):
             elif 'realtor.com' in key:
                 key = 'hang'
             res[key] = value
+        div3 = soup.select_one('#ldp-pricewrap')
+        price_spans = div3.select('span')
+        for span in price_spans:
+            if 'itemprop' in span.attrs:
+                if span.attrs['itemprop'] == 'price':
+                    res['price'] = int(span.attrs['content'])
+            # if '$' in li.text.strip():
+            #     res['price'] = int(li.text.strip().replace('$', '').replace(',', '').replace('Est.', ''))
     return res
     # except Exception as ex:
     #     print(ex)
@@ -177,10 +181,6 @@ def getRentInfoDetail(uid):
             # value = li.select_one('.data-value').text.strip().replace(',', '').split(' ')[-1]  # some use range like M75388-22154(https://www.realtor.com/realestateandhomes-detail/5101-N-A-St_Midland_TX_79705_M75388-22154)
             # print('key = {} & value = {}'.format(key, value))
             res[key] = value
-        price_lis = div1('li')
-        for li in price_lis:
-            if '$' in li.text.strip():
-                res['price'] = int(li.text.strip().replace('$', '').replace(',', '').replace('Est.', '').split(' ')[-1])
         div2 = soup.select_one('#key-fact-carousel')
         info_2_lis = div2.select_one('.owl-carousel').select('li')
         for li in info_2_lis:
@@ -191,6 +191,21 @@ def getRentInfoDetail(uid):
             elif 'realtor.com' in key:
                 key = 'hang'
             res[key] = value
+        # price_lis = div1('li')
+        # print(price_lis)
+        # for li in price_lis:
+        #     if '$' in li.text.strip():
+        #         res['price'] = int(li.text.strip().replace('$', '').replace(',', '').replace('Est.', '').split(' ')[-1])
+        div3 = soup.select_one('#ldp-pricewrap')
+        price_spans = div3.select('span')
+        for span in price_spans:
+            if 'itemprop' in span.attrs:
+                if span.attrs['itemprop'] == 'price':
+                    res['price'] = int(span.attrs['content'])
+                elif span.attrs['itemprop'] == 'lowPrice':
+                    res['lowPrice'] = int(span.attrs['content'])
+                elif span.attrs['itemprop'] == 'highPrice':
+                    res['highPrice'] = int(span.attrs['content'])
     return res
 
 if __name__ == '__main__':
@@ -250,6 +265,5 @@ if __name__ == '__main__':
                 print('result = {}'.format(res))
 
     # Step6: Get the summary
-                
 
 
